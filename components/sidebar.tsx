@@ -1,7 +1,9 @@
-import { Settings, Cpu, Zap, Box, Layers } from "lucide-react";
+import { Settings, Cpu, Zap, Box, Layers, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export function Sidebar() {
   return (
@@ -15,21 +17,56 @@ export function Sidebar() {
       
       <Separator />
       
-      <div className="p-4 flex-1 flex flex-col gap-6">
+      <div className="p-4 flex-1 flex flex-col gap-6 overflow-y-auto">
         <div className="space-y-3">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Configuration</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Agent Configuration</h3>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Model Name</label>
+              <Input defaultValue="gemini-3.1-pro-preview" className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Thinking Level</label>
+              <Input defaultValue="HIGH" className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">System Prompt</label>
+              <Textarea 
+                defaultValue="You are a helpful AI assistant." 
+                className="min-h-[80px] text-xs resize-none" 
+              />
+            </div>
+            <Button className="w-full h-8 text-xs">Save Configuration</Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Agent Persona</h3>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Name</label>
+              <Input defaultValue="Neural DEEP net" className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Role</label>
+              <Input defaultValue="Lead AI Assistant" className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Brief Description</label>
+              <Textarea 
+                defaultValue="A highly capable, Goose-inspired assistant that can interact with the internet and link to custom APIs." 
+                className="min-h-[60px] text-xs resize-none" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Knowledge Base</h3>
           <div className="space-y-1">
-            <Button variant="secondary" className="w-full justify-start h-9 text-sm">
-              <Cpu className="w-4 h-4 mr-2" />
-              Model Settings
-            </Button>
-            <Button variant="ghost" className="w-full justify-start h-9 text-sm">
-              <Settings className="w-4 h-4 mr-2" />
-              System Prompt
-            </Button>
-            <Button variant="ghost" className="w-full justify-start h-9 text-sm">
-              <Layers className="w-4 h-4 mr-2" />
-              Tools & APIs
+            <Button variant="ghost" className="w-full justify-start h-9 text-sm text-muted-foreground hover:text-foreground">
+              <BookOpen className="w-4 h-4 mr-2" />
+              Learning Logs
             </Button>
           </div>
         </div>

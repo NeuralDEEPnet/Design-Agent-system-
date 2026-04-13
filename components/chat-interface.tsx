@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Sparkles, Loader2, Globe, Code } from "lucide-react";
+import { Send, Bot, User, Sparkles, Loader2, Globe, Code, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,22 +10,19 @@ import { GoogleGenAI, ThinkingLevel, Type } from "@google/genai";
 import ReactMarkdown from "react-markdown";
 import { motion } from "motion/react";
 
-type Part = 
-  | { text: string }
-  | { functionCall: { name?: string; args?: any } }
-  | { functionResponse: { name: string; response: any } };
-
 type Content = {
   role: "user" | "model";
-  parts: Part[];
+  parts: any[];
 };
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<Content[]>([
-    { role: "model", parts: [{ text: "Agent Design System initialized. High thinking mode enabled. I can now search the web and fetch data from custom APIs. How can I assist you today?" }] }
+    { role: "model", parts: [{ text: "Agent Design System initialized. High thinking mode enabled. I now have a Long-Term Memory system to learn from my mistakes and successes. How can I assist you today?" }] }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeFeedback, setActiveFeedback] = useState<{ index: number, isPositive: boolean } | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,18 +31,24 @@ export function ChatInterface() {
     }
   }, [messages]);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent, overrideInput?: string) => {
     e?.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const messageText = overrideInput || input.trim();
+    if (!messageText || isLoading) return;
 
-    const userMessage = input.trim();
-    setInput("");
+    if (!overrideInput) setInput("");
     
-    const newUserContent: Content = { role: "user", parts: [{ text: userMessage }] };
+    const newUserContent: Content = { role: "user", parts: [{ text: messageText }] };
     setMessages(prev => [...prev, newUserContent]);
     setIsLoading(true);
 
     try {
+      if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+        setMessages(prev => [...prev, { role: "model", parts: [{ text: "**Configuration Error:** Gemini API key is missing. Please add `NEXT_PUBLIC_GEMINI_API_KEY` to your environment variables." }] }]);
+        setIsLoading(false);
+        return;
+      }
+
       const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
       
       let currentContents = [...messages, newUserContent];
@@ -56,6 +59,13 @@ export function ChatInterface() {
           model: "gemini-3.1-pro-preview",
           contents: currentContents as any,
           config: {
+            systemInstruction: `You are a Self-Evolving Agent, inspired by the architecture of MiniMax M2.7. 
+You have access to a Long-Term Memory system via the 'storeExperience' and 'recallExperiences' tools.
+CRITICAL INSTRUCTION: You must autonomously evolve and learn. 
+1. If you make a mistake and the user corrects you, you MUST use 'storeExperience' to save the lesson.
+2. If you encounter a new complex concept or figure out a successful pattern, you MUST use 'storeExperience' to save it.
+3. Before answering complex queries, you should use 'recallExperiences' to check your memory for relevant past lessons.
+Do not wait for explicit user feedback to learn; be proactive in your self-evolution.`,
             tools: [
               { googleSearch: {} },
               { 
@@ -72,6 +82,29 @@ export function ChatInterface() {
                       },
                       required: ["url"]
                     }
+                  },
+                  {
+                    name: "storeExperience",
+                    description: "Store a lesson, rule, or feedback into long-term memory so you don't forget it in future conversations. Use this when the user corrects you or when you figure out a successful pattern.",
+                    parameters: {
+                      type: Type.OBJECT,
+                      properties: {
+                        concept: { type: Type.STRING, description: "The core concept or topic (e.g., 'React Hooks', 'User Preference')" },
+                        lesson: { type: Type.STRING, description: "The detailed lesson learned or rule to follow" },
+                        type: { type: Type.STRING, description: "Either 'success' or 'failure'" }
+                      },
+                      required: ["concept", "lesson", "type"]
+                    }
+                  },
+                  {
+                    name: "recallExperiences",
+                    description: "Read all past experiences and lessons learned from the long-term memory bank.",
+                    parameters: {
+                      type: Type.OBJECT,
+                      properties: {
+                        query: { type: Type.STRING, description: "Optional filter query" }
+                      }
+                    }
                   }
                 ]
               }
@@ -81,51 +114,40 @@ export function ChatInterface() {
           }
         });
 
-        let textContent = "";
+        let modelResponseParts: any[] = [];
         let functionCallsToExecute: any[] = [];
 
         setMessages(prev => [...prev, { role: "model", parts: [] }]);
 
         for await (const chunk of responseStream) {
-          if (chunk.text) {
-            textContent += chunk.text;
-            setMessages(prev => {
-              const newMessages = [...prev];
-              const lastMsg = newMessages[newMessages.length - 1];
-              const textPartIndex = lastMsg.parts.findIndex(p => "text" in p);
-              if (textPartIndex >= 0) {
-                lastMsg.parts[textPartIndex] = { text: textContent };
+          const parts = chunk.candidates?.[0]?.content?.parts || [];
+          if (parts.length > 0) {
+            for (const part of parts) {
+              const lastPart = modelResponseParts[modelResponseParts.length - 1];
+              if (part.text !== undefined && lastPart?.text !== undefined && !!part.thought === !!lastPart.thought) {
+                lastPart.text += part.text;
               } else {
-                lastMsg.parts.push({ text: textContent });
+                modelResponseParts.push({ ...part });
               }
-              return newMessages;
-            });
+            }
           }
           if (chunk.functionCalls) {
             functionCallsToExecute.push(...chunk.functionCalls);
-            setMessages(prev => {
-              const newMessages = [...prev];
-              const lastMsg = newMessages[newMessages.length - 1];
-              for (const fc of chunk.functionCalls!) {
-                lastMsg.parts.push({ functionCall: fc });
-              }
-              return newMessages;
-            });
           }
+          
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].parts = [...modelResponseParts];
+            return newMessages;
+          });
         }
 
-        const modelResponseParts: Part[] = [];
-        if (textContent) modelResponseParts.push({ text: textContent });
-        for (const fc of functionCallsToExecute) {
-          modelResponseParts.push({ functionCall: fc });
-        }
-        
         if (modelResponseParts.length > 0) {
           currentContents.push({ role: "model", parts: modelResponseParts });
         }
 
         if (functionCallsToExecute.length > 0) {
-          const functionResponses: Part[] = [];
+          const functionResponses: any[] = [];
           for (const call of functionCallsToExecute) {
             if (call.name === "fetchApi") {
               try {
@@ -139,15 +161,40 @@ export function ChatInterface() {
                 functionResponses.push({
                   functionResponse: {
                     name: call.name,
-                    response: { result: data.substring(0, 15000) } // limit size to avoid token overflow
+                    response: { result: data.substring(0, 15000) }
                   }
                 });
               } catch (e: any) {
                 functionResponses.push({
-                  functionResponse: {
-                    name: call.name,
-                    response: { error: e.message }
-                  }
+                  functionResponse: { name: call.name, response: { error: e.message } }
+                });
+              }
+            } else if (call.name === "storeExperience") {
+              try {
+                const res = await fetch("/api/memory", {
+                  method: "POST",
+                  body: JSON.stringify(call.args),
+                  headers: { "Content-Type": "application/json" }
+                });
+                const data = await res.json();
+                functionResponses.push({
+                  functionResponse: { name: call.name, response: data }
+                });
+              } catch (e: any) {
+                functionResponses.push({
+                  functionResponse: { name: call.name, response: { error: e.message } }
+                });
+              }
+            } else if (call.name === "recallExperiences") {
+              try {
+                const res = await fetch("/api/memory");
+                const data = await res.json();
+                functionResponses.push({
+                  functionResponse: { name: call.name, response: data }
+                });
+              } catch (e: any) {
+                functionResponses.push({
+                  functionResponse: { name: call.name, response: { error: e.message } }
                 });
               }
             }
@@ -160,9 +207,13 @@ export function ChatInterface() {
           isDone = true;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating response:", error);
-      setMessages(prev => [...prev, { role: "model", parts: [{ text: "An error occurred while processing your request." }] }]);
+      const errorMessage = error?.message || "An unexpected error occurred.";
+      setMessages(prev => [...prev, { 
+        role: "model", 
+        parts: [{ text: `**Error:** ${errorMessage}\n\nPlease try again or adjust your request.` }] 
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -173,6 +224,36 @@ export function ChatInterface() {
       e.preventDefault();
       handleSubmit();
     }
+  };
+
+  const handleFeedbackClick = (isPositive: boolean, messageIndex: number) => {
+    setActiveFeedback({ index: messageIndex, isPositive });
+    setFeedbackComment("");
+  };
+
+  const submitFeedback = () => {
+    if (!activeFeedback) return;
+    
+    const targetMessage = messages[activeFeedback.index];
+    const messageContent = targetMessage?.parts
+      ?.filter(p => p.text !== undefined && !p.thought)
+      .map(p => p.text)
+      .join("")
+      .replace(/"/g, "'")
+      .substring(0, 500) || "Unknown context";
+
+    const feedbackText = `SYSTEM FEEDBACK: The user provided feedback on your response. 
+You MUST use the storeExperience tool to save this feedback.
+Use EXACTLY these parameters for the tool call:
+{
+  "concept": "${messageContent}...",
+  "lesson": "${feedbackComment}",
+  "type": "${activeFeedback.isPositive ? 'success' : 'failure'}"
+}`;
+    
+    handleSubmit(undefined, feedbackText);
+    setActiveFeedback(null);
+    setFeedbackComment("");
   };
 
   return (
@@ -192,6 +273,7 @@ export function ChatInterface() {
             const isOnlyFuncResponses = msg.role === "user" && msg.parts.every(p => "functionResponse" in p);
             
             if (isOnlyFuncResponses) {
+              const hasError = msg.parts.some(p => p.functionResponse?.response?.error);
               return (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -199,9 +281,9 @@ export function ChatInterface() {
                   key={i} 
                   className="flex gap-4 justify-end"
                 >
-                  <div className="text-[10px] text-muted-foreground bg-secondary/30 px-3 py-1.5 rounded-md font-mono border border-border/50 flex items-center gap-2">
+                  <div className={`text-[10px] ${hasError ? 'text-red-500 bg-red-500/10 border-red-500/20' : 'text-muted-foreground bg-secondary/30 border-border/50'} px-3 py-1.5 rounded-md font-mono border flex items-center gap-2`}>
                     <Code className="w-3 h-3" />
-                    {msg.parts.map(p => "functionResponse" in p ? `✓ ${p.functionResponse.name} returned data` : "").join(", ")}
+                    {msg.parts.map(p => "functionResponse" in p ? (p.functionResponse.response?.error ? `✗ ${p.functionResponse.name} failed` : `✓ ${p.functionResponse.name} returned data`) : "").join(", ")}
                   </div>
                 </motion.div>
               );
@@ -219,12 +301,29 @@ export function ChatInterface() {
                   {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                 </Avatar>
                 <div className={`flex-1 space-y-2 ${msg.role === "user" ? "text-right" : ""}`}>
-                  <div className="text-xs font-medium text-muted-foreground">
-                    {msg.role === "user" ? "You" : "Agent"}
+                  <div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+                    <span>{msg.role === "user" ? "You" : "Agent"}</span>
+                    {msg.role === "model" && !isLoading && i === messages.length - 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-green-500" onClick={() => handleFeedbackClick(true, i)}>
+                          <ThumbsUp className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-red-500" onClick={() => handleFeedbackClick(false, i)}>
+                          <ThumbsDown className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className={`text-sm leading-relaxed max-w-none ${msg.role === "user" ? "bg-primary text-primary-foreground inline-block p-3 rounded-2xl rounded-tr-sm text-left" : ""}`}>
                     {msg.parts.map((part, j) => {
-                      if ("text" in part) {
+                      if (part.text !== undefined) {
+                        if (part.thought) {
+                          return (
+                            <div key={j} className="text-xs text-muted-foreground italic border-l-2 border-muted pl-2 my-2 opacity-70">
+                              <ReactMarkdown>{part.text}</ReactMarkdown>
+                            </div>
+                          );
+                        }
                         return msg.role === "user" ? (
                           <span key={j}>{part.text}</span>
                         ) : (
@@ -233,15 +332,15 @@ export function ChatInterface() {
                           </div>
                         );
                       }
-                      if ("functionCall" in part) {
+                      if (part.functionCall) {
                         return (
                           <div key={j} className="my-3 p-3 bg-secondary/40 border border-border rounded-lg font-mono text-xs text-muted-foreground flex items-center gap-3">
                             <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
                               <Globe className="w-3 h-3 text-blue-500" />
                             </div>
                             <div className="flex flex-col gap-0.5 overflow-hidden">
-                              <span className="font-semibold text-foreground">Calling API</span>
-                              <span className="truncate opacity-80">{part.functionCall.args?.url || part.functionCall.name}</span>
+                              <span className="font-semibold text-foreground">Calling Tool</span>
+                              <span className="truncate opacity-80">{part.functionCall.name}</span>
                             </div>
                           </div>
                         );
@@ -249,6 +348,35 @@ export function ChatInterface() {
                       return null;
                     })}
                   </div>
+                  {activeFeedback?.index === i && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="mt-3 p-3 bg-secondary/50 rounded-lg border border-border flex flex-col gap-2"
+                    >
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {activeFeedback.isPositive ? "What did you like about this response?" : "What went wrong with this response?"}
+                      </div>
+                      <div className="flex gap-2">
+                        <input 
+                          value={feedbackComment}
+                          onChange={(e) => setFeedbackComment(e.target.value)}
+                          placeholder="Provide feedback to help the agent learn..."
+                          className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') submitFeedback();
+                          }}
+                          autoFocus
+                        />
+                        <Button size="sm" className="h-8 text-xs shrink-0" onClick={submitFeedback}>
+                          Submit
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs shrink-0" onClick={() => setActiveFeedback(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </motion.div>
             );
@@ -266,7 +394,7 @@ export function ChatInterface() {
                 <div className="text-xs font-medium text-muted-foreground">Agent</div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Thinking deeply...</span>
+                  <span>Thinking deeply & searching memory...</span>
                 </div>
               </div>
             </motion.div>
@@ -293,8 +421,13 @@ export function ChatInterface() {
           </Button>
         </div>
         <div className="max-w-3xl mx-auto mt-2 flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
-            <Globe className="w-3 h-3" /> Web Search & API Fetch Enabled
+          <span className="text-[10px] text-muted-foreground font-mono flex items-center gap-2">
+            <span className="flex items-center gap-1 text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+              <Sparkles className="w-3 h-3" /> Self-Evolving Mode Active
+            </span>
+            <span className="flex items-center gap-1">
+              <Globe className="w-3 h-3" /> Tools & Memory Enabled
+            </span>
           </span>
           <span className="text-[10px] text-muted-foreground font-mono">
             Powered by gemini-3.1-pro-preview
