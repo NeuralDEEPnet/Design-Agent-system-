@@ -257,10 +257,11 @@ Use EXACTLY these parameters for the tool call:
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-background relative">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
+    <div className="flex-1 flex flex-col h-full bg-background/95 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background to-background pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
       
-      <header className="h-14 border-b border-border flex items-center px-6 backdrop-blur-md bg-background/80 sticky top-0 z-10">
+      <header className="h-14 border-b border-white/5 flex items-center px-6 backdrop-blur-xl bg-background/40 sticky top-0 z-20 shadow-[0_4px_24px_-12px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-blue-500" />
           <h1 className="text-sm font-medium">Agent Workspace</h1>
@@ -297,8 +298,8 @@ Use EXACTLY these parameters for the tool call:
                 key={i} 
                 className={`flex gap-4 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
               >
-                <Avatar className={`w-8 h-8 flex items-center justify-center border shrink-0 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                  {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                <Avatar className={`w-8 h-8 flex items-center justify-center border shrink-0 shadow-md ${msg.role === "user" ? "bg-gradient-to-br from-primary to-blue-600 text-primary-foreground border-white/20 ring-1 ring-primary/30" : "bg-secondary/80 text-secondary-foreground border-white/10 backdrop-blur-sm"}`}>
+                  {msg.role === "user" ? <User className="w-4 h-4 drop-shadow-sm" /> : <Bot className="w-4 h-4" />}
                 </Avatar>
                 <div className={`flex-1 space-y-2 ${msg.role === "user" ? "text-right" : ""}`}>
                   <div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
@@ -314,7 +315,7 @@ Use EXACTLY these parameters for the tool call:
                       </div>
                     )}
                   </div>
-                  <div className={`text-sm leading-relaxed max-w-none ${msg.role === "user" ? "bg-primary text-primary-foreground inline-block p-3 rounded-2xl rounded-tr-sm text-left" : ""}`}>
+                  <div className={`text-sm leading-relaxed max-w-none ${msg.role === "user" ? "bg-gradient-to-br from-primary to-blue-600 text-primary-foreground inline-block p-3 rounded-2xl rounded-tr-sm text-left shadow-lg shadow-primary/20 border border-white/10" : "bg-secondary/30 backdrop-blur-sm border border-white/5 p-4 rounded-2xl rounded-tl-sm shadow-sm"}`}>
                     {msg.parts.map((part, j) => {
                       if (part.text !== undefined) {
                         if (part.thought) {
@@ -334,8 +335,8 @@ Use EXACTLY these parameters for the tool call:
                       }
                       if (part.functionCall) {
                         return (
-                          <div key={j} className="my-3 p-3 bg-secondary/40 border border-border rounded-lg font-mono text-xs text-muted-foreground flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                          <div key={j} className="my-3 p-3 bg-secondary/30 border border-white/5 rounded-xl font-mono text-xs text-muted-foreground flex items-center gap-3 shadow-inner backdrop-blur-sm">
+                            <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(59,130,246,0.3)]">
                               <Globe className="w-3 h-3 text-blue-500" />
                             </div>
                             <div className="flex flex-col gap-0.5 overflow-hidden">
@@ -362,16 +363,16 @@ Use EXACTLY these parameters for the tool call:
                           value={feedbackComment}
                           onChange={(e) => setFeedbackComment(e.target.value)}
                           placeholder="Provide feedback to help the agent learn..."
-                          className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex h-9 w-full rounded-lg border border-white/10 bg-secondary/50 px-3 py-1 text-xs shadow-inner transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') submitFeedback();
                           }}
                           autoFocus
                         />
-                        <Button size="sm" className="h-8 text-xs shrink-0" onClick={submitFeedback}>
+                        <Button size="sm" className="h-9 text-xs shrink-0 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-md shadow-primary/20 border border-white/10" onClick={submitFeedback}>
                           Submit
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs shrink-0" onClick={() => setActiveFeedback(null)}>
+                        <Button size="sm" variant="ghost" className="h-9 text-xs shrink-0 hover:bg-white/5" onClick={() => setActiveFeedback(null)}>
                           Cancel
                         </Button>
                       </div>
@@ -387,7 +388,7 @@ Use EXACTLY these parameters for the tool call:
               animate={{ opacity: 1, y: 0 }}
               className="flex gap-4"
             >
-              <Avatar className="w-8 h-8 flex items-center justify-center border bg-secondary text-secondary-foreground shrink-0">
+              <Avatar className="w-8 h-8 flex items-center justify-center border bg-secondary/80 text-secondary-foreground shrink-0 shadow-md border-white/10 backdrop-blur-sm">
                 <Bot className="w-4 h-4" />
               </Avatar>
               <div className="flex-1 space-y-2">
@@ -402,22 +403,22 @@ Use EXACTLY these parameters for the tool call:
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t border-border bg-background/80 backdrop-blur-md z-10">
-        <div className="max-w-3xl mx-auto relative flex items-end gap-2">
+      <div className="p-4 border-t border-white/5 bg-background/60 backdrop-blur-xl z-20 shadow-[0_-4px_24px_-12px_rgba(0,0,0,0.5)]">
+        <div className="max-w-3xl mx-auto relative flex items-end gap-3">
           <Textarea 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask the agent anything, e.g. 'Search the web for...' or 'Fetch data from this API...'"
-            className="min-h-[60px] max-h-[200px] resize-none rounded-xl bg-secondary/50 border-border focus-visible:ring-1 focus-visible:ring-primary/30 text-sm py-3 px-4"
+            className="min-h-[60px] max-h-[200px] resize-none rounded-2xl bg-secondary/40 border-white/10 shadow-inner focus-visible:ring-1 focus-visible:ring-primary/50 text-sm py-3.5 px-5 backdrop-blur-sm transition-all"
           />
           <Button 
             size="icon" 
-            className="h-[60px] w-[60px] rounded-xl shrink-0"
+            className="h-[60px] w-[60px] rounded-2xl shrink-0 bg-gradient-to-br from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-lg shadow-primary/25 border border-white/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
             onClick={handleSubmit}
             disabled={!input.trim() || isLoading}
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-5 h-5 drop-shadow-sm" />
           </Button>
         </div>
         <div className="max-w-3xl mx-auto mt-2 flex items-center justify-between">
